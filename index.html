@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Epidemiology Bias Mastery</title>
+    <style>
+        :root {
+            --primary: #2c3e50; --secondary: #3498db; --success: #27ae60;
+            --danger: #e74c3c; --light: #f4f7f6; --gold: #f1c40f;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--light); display: flex; justify-content: center; padding: 20px; }
+        .quiz-container { background: white; width: 100%; max-width: 700px; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .progress { font-size: 0.9rem; color: #7f8c8d; margin-bottom: 10px; }
+        .question-text { font-size: 1.3rem; font-weight: bold; color: var(--primary); margin-bottom: 20px; }
+        .options-list { display: flex; flex-direction: column; gap: 10px; }
+        .option-btn { 
+            padding: 15px; border: 2px solid #ddd; border-radius: 8px; background: none; 
+            cursor: pointer; text-align: left; font-size: 1rem; transition: 0.3s; 
+        }
+        .option-btn:hover:not([disabled]) { border-color: var(--secondary); background: #ebf5fb; }
+        .correct { background: var(--success) !important; color: white; border-color: var(--success); }
+        .wrong { background: var(--danger) !important; color: white; border-color: var(--danger); }
+        
+        /* Feedback Sections */
+        .feedback-box { margin-top: 20px; padding: 20px; border-radius: 8px; display: none; line-height: 1.6; border: 1px solid #ddd; }
+        .example-block { background: #fdf6e3; padding: 15px; border-left: 5px solid var(--gold); margin-top: 10px; font-style: italic; }
+        
+        /* Text Entry Section */
+        .text-entry-section { margin-top: 25px; display: none; border-top: 2px solid #eee; padding-top: 20px; }
+        textarea { width: 100%; height: 80px; padding: 10px; border-radius: 8px; border: 2px solid #ccc; font-family: inherit; margin-bottom: 10px; box-sizing: border-box;}
+        
+        .score-pill { display: inline-block; padding: 5px 15px; border-radius: 20px; background: var(--primary); color: white; font-weight: bold; margin-top: 10px; }
+        
+        #next-btn { 
+            margin-top: 20px; width: 100%; padding: 15px; background: var(--secondary); 
+            color: white; border: none; border-radius: 8px; cursor: pointer; display: none; font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div class="quiz-container" id="quiz-box">
+    <div class="progress">Case <span id="current-num">1</span> of <span id="total-num">--</span></div>
+    <div id="question-content">
+        <div class="question-text" id="question">Loading...</div>
+        <div class="options-list" id="options"></div>
+    </div>
+
+    <div id="feedback-area" class="feedback-box">
+        <div id="mcq-status"></div>
+        <div id="bias-example" class="example-block"></div>
+        
+        <div id="text-entry-area" class="text-entry-section">
+            <p><strong>Challenge:</strong> Provide your own unique example of this bias:</p>
+            <textarea id="user-example-input" placeholder="Type your scenario here..."></textarea>
+            <button class="option-btn" style="width:100%; text-align:center; background: var(--primary); color:white;" onclick="gradeExample()">Submit for Grading</button>
+            <div id="grading-result" style="margin-top:15px; display:none;">
+                <div id="score-display" class="score-pill"></div>
+                <p id="grading-feedback"></p>
+            </div>
+        </div>
+    </div>
+
+    <button id="next-btn" onclick="loadNextQuestion()">Next Case &rarr;</button>
+</div>
+
+<script>
+    const quizData = [
+        {
+            bias: "Recall Bias",
+            question: "In a case-control study on congenital heart defects, mothers of affected children reported their flu history more accurately than mothers of healthy children. What is this?",
+            options: ["Selection Bias", "Recall Bias", "Confounding", "Observer Bias"],
+            correct: 1,
+            officialExample: "A person with lung cancer may spend more time thinking about every cigarette they ever smoked, while a healthy person might forget the occasional social smoking they did 20 years ago.",
+            keywords: ["memory", "past", "remember", "forget", "recall", "accuracy", "history"]
+        },
+        {
+            bias: "Selection Bias",
+            question: "A study on fitness only recruits participants from a high-end CrossFit gym. The results are used to describe the average fitness level of the entire city. What is this?",
+            options: ["Information Bias", "Confounding", "Selection Bias", "Response Bias"],
+            correct: 2,
+            officialExample: "The 'Healthy Worker Effect'—comparing the mortality of world-class athletes to the general public, which includes people too sick to work or exercise.",
+            keywords: ["recruit", "sample", "enroll", "chosen", "group", "population", "represent"]
+        }
+    ];
+
+    let currentIdx = 0;
+
+    function init() {
+        document.getElementById('total-num').innerText = quizData.length;
+        renderQuestion();
+    }
+
+    function renderQuestion() {
+        const p = quizData[currentIdx];
+        document.getElementById('question').innerText = p.question;
+        document.getElementById('current-num').innerText = currentIdx + 1;
+        const optionsArea = document.getElementById('options');
+        optionsArea.innerHTML = '';
+        
+        // Reset View
+        document.getElementById('feedback-area').style.display = 'none';
+        document.getElementById('text-entry-area').style.display = 'none';
+        document.getElementById('grading-result').style.display = 'none';
+        document.getElementById('next-btn').style.display = 'none';
+        document.getElementById('user-example-input').value = '';
+
+        p.options.forEach((opt, i) => {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn';
+            btn.innerText = opt;
+            btn.onclick = () => handleMCQ(i, btn);
+            optionsArea.appendChild(btn);
+        });
+    }
+
+    function handleMCQ(choice, btn) {
+        const p = quizData[currentIdx];
+        const allBtns = document.querySelectorAll('.option-btn');
+        allBtns.forEach(b => b.disabled = true);
+
+        const status = document.getElementById('mcq-status');
+        const fbArea = document.getElementById('feedback-area');
+        
+        if(choice === p.correct) {
+            btn.classList.add('correct');
+            status.innerHTML = `<h3 style="color:var(--success); margin:0;">Correct!</h3>`;
+        } else {
+            btn.classList.add('wrong');
+            allBtns[p.correct].classList.add('correct');
+            status.innerHTML = `<h3 style="color:var(--danger); margin:0;">Incorrect.</h3>`;
+        }
+
+        document.getElementById('bias-example').innerHTML = `<strong>Study Example:</strong> ${p.officialExample}`;
+        fbArea.style.display = 'block';
+        document.getElementById('text-entry-area').style.display = 'block';
+    }
+
+    function gradeExample() {
+        const input = document.getElementById('user-example-input').value.toLowerCase();
+        const p = quizData[currentIdx];
+        const display = document.getElementById('grading-result');
+        const scorePill = document.getElementById('score-display');
+        const feed = document.getElementById('grading-feedback');
+
+        if(input.length < 15) {
+            alert("Please provide a more detailed example.");
+            return;
+        }
+
+        // Simulated AI Grading based on Keyword matching
+        let points = 0;
+        p.keywords.forEach(word => {
+            if(input.includes(word)) points += 20;
+        });
+        
+        // Length bonus
+        if(input.length > 50) points += 20;
+        
+        const finalScore = Math.min(100, points + 10); // Base 10 points for trying
+
+        display.style.display = 'block';
+        scorePill.innerText = `Score: ${finalScore}/100`;
+        
+        if(finalScore >= 70) {
+            feed.innerText = "Excellent application of the concept! You accurately identified the core mechanisms of this bias.";
+        } else if (finalScore >= 40) {
+            feed.innerText = "Good effort. Try to incorporate more specific details about how the groups differ in their outcome or exposure.";
+        } else {
+            feed.innerText = "Your example is a bit vague. Remember that " + p.bias + " specifically involves " + p.keywords[0] + ".";
+        }
+
+        document.getElementById('next-btn').style.display = 'block';
+    }
+
+    function loadNextQuestion() {
+        currentIdx++;
+        if(currentIdx < quizData.length) {
+            renderQuestion();
+        } else {
+            document.getElementById('quiz-box').innerHTML = `<div style="text-align:center"><h2>Investigation Complete</h2><p>You have mastered the types of bias.</p><button class="option-btn" style="width:100%; text-align:center" onclick="location.reload()">Restart</button></div>`;
+        }
+    }
+
+    window.onload = init;
+</script>
+</body>
+</html>
